@@ -1,0 +1,471 @@
+{
+  "info": {
+    "name": "Ride Booking Backend",
+    "description": "Full API flow: rider/driver/owner auth, fare estimate, ride request, owner assignment, driver accept/start/complete. Test scripts auto-save tokens and IDs into collection variables, so you can run requests in order (or use Collection Runner) without manual copy-paste.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "riderToken", "value": "" },
+    { "key": "driverToken", "value": "" },
+    { "key": "ownerToken", "value": "" },
+    { "key": "driverId", "value": "" },
+    { "key": "fareId", "value": "" },
+    { "key": "rideId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register Rider",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/register/rider",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Rider\",\n  \"email\": \"alice@test.com\",\n  \"phone\": \"+15551234001\",\n  \"password\": \"password123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.collectionVariables.set('riderToken', data.token);",
+                  "  pm.test('Rider registered', () => pm.expect(data.token).to.be.a('string'));",
+                  "} else if (pm.response.code === 409) {",
+                  "  console.log('Rider already exists - run Login Rider instead');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Driver",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/register/driver",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bob Driver\",\n  \"email\": \"bob@test.com\",\n  \"phone\": \"+15551234002\",\n  \"password\": \"password123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.collectionVariables.set('driverToken', data.token);",
+                  "  pm.collectionVariables.set('driverId', data.userId);",
+                  "  pm.test('Driver registered', () => pm.expect(data.token).to.be.a('string'));",
+                  "} else if (pm.response.code === 409) {",
+                  "  console.log('Driver already exists - run Login Driver instead');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Rider",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login/rider",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@test.com\",\n  \"password\": \"password123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('riderToken', data.token);",
+                  "pm.test('Login succeeded', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Driver",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login/driver",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@test.com\",\n  \"password\": \"password123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('driverToken', data.token);",
+                  "pm.collectionVariables.set('driverId', data.userId);",
+                  "pm.test('Login succeeded', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Owner",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login/owner",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@test.com\",\n  \"password\": \"password123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('ownerToken', data.token);",
+                  "pm.test('Login succeeded', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Driver Goes Online",
+      "item": [
+        {
+          "name": "Update Driver Location",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{driverToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/drivers/location",
+            "body": { "mode": "raw", "raw": "{\n  \"lat\": 40.7300,\n  \"lng\": -73.9950\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Location updated', () => pm.response.to.have.status(204));"] }
+            }
+          ]
+        },
+        {
+          "name": "Set Driver Available",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driverToken}}" }],
+            "url": "{{baseUrl}}/api/drivers/status/available"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status set', () => pm.response.to.have.status(204));"] }
+            }
+          ]
+        },
+        {
+          "name": "Owner: List Available Drivers",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": "{{baseUrl}}/api/owner/drivers/available"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('Bob is available', () => {",
+                  "  const drivers = pm.response.json();",
+                  "  pm.expect(drivers.some(d => d.id === pm.collectionVariables.get('driverId'))).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Fare + Ride Request",
+      "item": [
+        {
+          "name": "Create Fare Estimate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{riderToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/fares",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": { \"lat\": 40.7128, \"lng\": -74.0060 },\n  \"destination\": { \"lat\": 40.7580, \"lng\": -73.9855 }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('fareId', data.fareId);",
+                  "pm.test('Fare created', () => pm.response.to.have.status(201));",
+                  "pm.test('Has price', () => pm.expect(data.estimatedPrice).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request Ride",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{riderToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/rides",
+            "body": { "mode": "raw", "raw": "{\n  \"fareId\": \"{{fareId}}\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('rideId', data.rideId);",
+                  "pm.test('Ride created', () => pm.response.to.have.status(201));",
+                  "pm.test('Status is pending_assignment', () => pm.expect(data.status).to.eql('pending_assignment'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rider: Get Ride",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }],
+            "url": "{{baseUrl}}/api/rides/{{rideId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Owner Assignment",
+      "item": [
+        {
+          "name": "Owner: List Pending Rides",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": "{{baseUrl}}/api/owner/rides/pending"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Our ride is pending', () => {",
+                  "  const rides = pm.response.json();",
+                  "  pm.expect(rides.some(r => r.rideId === pm.collectionVariables.get('rideId'))).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner: Nearby Drivers For Ride",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": "{{baseUrl}}/api/owner/drivers/nearby?rideId={{rideId}}"
+          }
+        },
+        {
+          "name": "Owner: Assign Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{ownerToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/owner/rides/{{rideId}}/assign",
+            "body": { "mode": "raw", "raw": "{\n  \"driverId\": \"{{driverId}}\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.test('Assignment succeeded', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is driver_assigned', () => pm.expect(data.status).to.eql('driver_assigned'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Driver Trip Lifecycle",
+      "item": [
+        {
+          "name": "Driver: Accept Ride",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{driverToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/rides/{{rideId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"accept\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.test('Status is driver_accepted', () => pm.expect(data.status).to.eql('driver_accepted'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Driver: Start Ride",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driverToken}}" }],
+            "url": "{{baseUrl}}/api/rides/{{rideId}}/start"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.test('Status is in_progress', () => pm.expect(data.status).to.eql('in_progress'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Driver: Complete Ride",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driverToken}}" }],
+            "url": "{{baseUrl}}/api/rides/{{rideId}}/complete"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.test('Status is completed', () => pm.expect(data.status).to.eql('completed'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Edge Cases",
+      "item": [
+        {
+          "name": "Reject: Wrong Role On Owner Route",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{riderToken}}" }],
+            "url": "{{baseUrl}}/api/owner/rides/pending"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Forbidden for rider', () => pm.response.to.have.status(403));"] }
+            }
+          ]
+        },
+        {
+          "name": "Reject: No Auth Header",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/rides/{{rideId}}" },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Unauthorized without token', () => pm.response.to.have.status(401));"] }
+            }
+          ]
+        },
+        {
+          "name": "Reject: Assign On Non-Pending Ride",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{ownerToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/owner/rides/{{rideId}}/assign",
+            "body": { "mode": "raw", "raw": "{\n  \"driverId\": \"{{driverId}}\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Conflict - ride already completed', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject: Invalid Body (bad lat/lng)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/fares",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": { \"lat\": 999, \"lng\": -74.0060 },\n  \"destination\": { \"lat\": 40.7580, \"lng\": -73.9855 }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Bad request for invalid lat', () => pm.response.to.have.status(400));"] }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
