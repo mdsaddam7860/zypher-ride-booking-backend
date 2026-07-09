@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Ride booking backend: riders request fares/rides, owner manually assigns drivers, drivers accept/deny and run the trip.",
   "main": "dist/server.js",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
