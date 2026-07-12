@@ -13,7 +13,12 @@ import { logger } from "../utils/logger";
 // an "actor" — there's no real user driving these, so we use a stable
 // system placeholder, same pattern as notification.service.ts's
 // "owner-dashboard" broadcast marker.
-const SYSTEM_ACTOR = { userId: "system:auto-dispatch", role: "owner" as const };
+// Dispatch-originated DB writes (audit log entries) need an "actor", but
+// there's no real user driving these. ride_audit_log.actor_id is a `uuid`
+// column, so unlike notification.service.ts's "owner-dashboard" string
+// placeholder, we need an actual valid UUID here — the nil UUID is a
+// widely-used convention for "no real user, system-generated."
+const SYSTEM_ACTOR = { userId: "00000000-0000-0000-0000-000000000000", role: "owner" as const };
 
 /**
  * Finds the next untried nearby available driver for a ride and creates a
