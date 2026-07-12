@@ -24,6 +24,7 @@ export const rideController = {
         scheduledStartAt: req.body.scheduledStartAt,
         paymentMethod: req.body.paymentMethod,
         notes: req.body.notes,
+        bookingType: req.body.bookingType,
       });
       const fare = await fareService.getById(ride.fare_id);
       res.status(201).json(serializeRide(ride, { fare, viewerRole: "rider" }));

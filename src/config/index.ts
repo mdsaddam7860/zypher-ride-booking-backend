@@ -65,6 +65,17 @@ export const config = {
     lateRefundPercent: 50,
   },
 
+  dispatch: {
+    // Auto-dispatch search radius around pickup, meters.
+    searchRadiusMeters: parseInt(process.env.DISPATCH_SEARCH_RADIUS_METERS ?? "10000", 10),
+    // How many nearest drivers to consider trying, sequentially, before
+    // giving up and falling back to the owner's manual queue.
+    maxDriversToTry: parseInt(process.env.DISPATCH_MAX_DRIVERS_TO_TRY ?? "5", 10),
+    // How long a single driver has to accept/decline before we move on to
+    // the next-nearest driver.
+    offerTimeoutSeconds: parseInt(process.env.DISPATCH_OFFER_TIMEOUT_SECONDS ?? "20", 10),
+  },
+
   // Firebase Cloud Messaging — HTTP v1 API (via firebase-admin), not the
   // deprecated legacy Server Key API.
   //

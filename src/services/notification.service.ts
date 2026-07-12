@@ -81,4 +81,22 @@ export const notificationService = {
 
   notifyStatusChange: (recipientId: string, recipientRole: Role, rideId: string, status: string) =>
     send(recipientId, recipientRole, "Ride status changed", `Ride ${rideId} is now ${status}.`, rideId),
+
+  notifyDriverRideOffer: (driverId: string, rideId: string) =>
+    send(
+      driverId,
+      "driver",
+      "New ride offer",
+      `A nearby ride ${rideId} is available. Accept or decline.`,
+      rideId
+    ),
+
+  notifyOwnerAutoDispatchExhausted: (rideId: string) =>
+    send(
+      "owner-dashboard",
+      "owner",
+      "Auto-dispatch found no driver",
+      `Ride ${rideId} couldn't be auto-assigned — needs manual assignment.`,
+      rideId
+    ),
 };

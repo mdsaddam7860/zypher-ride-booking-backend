@@ -65,4 +65,50 @@ export const driverService = {
       .map((d) => ({ ...d, distanceMeters: haversineDistanceMeters(target, { lat: d.lat, lng: d.lng }) }))
       .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
   },
+
+  /**
+   * Real geospatial nearest-driver search via PostGIS, used by the
+   * auto-dispatch flow (dispatch.service.ts). Uses the `geog` column kept in
+   * sync by the `driver_locations_sync_geog` trigger — see migration
+   * 20260706000008. Returns drivers ordered nearest-first, capped to `limit`.
+   */
+  async findNearestAvailable(
+    target: LatLng,
+    opts: { radiusMeters: number; limit: number }
+  ): Promise<(DriverWithLocation & { distanceMeters: number })[]> {
+    const rows = await db("drivers as d")
+      .join("driver_locations as dl", "d.id", "dl.driver_id")
+      .where("d.status", "available")
+      .whereRaw("ST_DWithin(dl.geog, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)", [
+        target.lng,
+        target.lat,
+        opts.radiusMeters,
+      ])
+      .select(
+        "d.id as id",
+        "d.name as name",
+        "d.status as status",
+        "dl.lat as lat",
+        "dl.lng as lng",
+        "dl.updated_at as updatedAt"
+      )
+      .select(
+        db.raw(
+          "ST_Distance(dl.geog, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography) as distance_meters",
+          [target.lng, target.lat]
+        )
+      )
+      .orderBy("distance_meters", "asc")
+      .limit(opts.limit);
+
+    return rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      status: r.status,
+      lat: Number(r.lat),
+      lng: Number(r.lng),
+      updatedAt: r.updatedAt,
+      distanceMeters: Math.round(Number(r.distance_meters)),
+    }));
+  },
 };

@@ -9,10 +9,16 @@ import {
   listRidesQuerySchema,
   nearbyDriversQuerySchema,
 } from "../validators/owner.validator";
+import { changePasswordSchema, updateProfileSchema } from "../validators/profile.validator";
 
 const router = Router();
 
 router.use(requireAuth, requireRole("owner"));
+
+// GET/PATCH /api/owner/me — owner's own profile + password.
+router.get("/me", profileController.getMyOwnerProfile);
+router.patch("/me", validateBody(updateProfileSchema), profileController.updateMyProfile);
+router.patch("/me/password", validateBody(changePasswordSchema), profileController.changeMyPassword);
 
 router.get("/rides/pending", ownerController.listPendingRides);
 // All rides — pending, in-progress, completed, etc — sorted for the dashboard.

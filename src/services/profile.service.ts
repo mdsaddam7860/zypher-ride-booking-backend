@@ -1,6 +1,15 @@
+import bcrypt from "bcryptjs";
 import { db } from "../db/connection";
-import { DriverRow, RiderRow } from "../types";
-import { NotFoundError } from "../utils/errors";
+import { DriverRow, OwnerRow, Role, RiderRow } from "../types";
+import { NotFoundError, UnauthorizedError, ConflictError, BadRequestError } from "../utils/errors";
+
+const SALT_ROUNDS = 10;
+
+function tableFor(role: Role): "riders" | "drivers" | "owners" {
+  if (role === "rider") return "riders";
+  if (role === "driver") return "drivers";
+  return "owners";
+}
 
 export function serializeRiderProfile(rider: RiderRow) {
   return {
@@ -23,6 +32,20 @@ export function serializeDriverProfile(driver: DriverRow) {
   };
 }
 
+export function serializeOwnerProfile(owner: OwnerRow) {
+  return {
+    ownerId: owner.id,
+    email: owner.email,
+    createdAt: owner.created_at,
+  };
+}
+
+export interface ProfileUpdateInput {
+  name?: string;
+  email?: string;
+  phone?: string;
+}
+
 export const profileService = {
   async getRiderById(riderId: string): Promise<RiderRow> {
     const rider = await db<RiderRow>("riders").where({ id: riderId }).first();
@@ -34,5 +57,52 @@ export const profileService = {
     const driver = await db<DriverRow>("drivers").where({ id: driverId }).first();
     if (!driver) throw new NotFoundError("Driver not found");
     return driver;
+  },
+
+  async getOwnerById(ownerId: string): Promise<OwnerRow> {
+    const owner = await db<OwnerRow>("owners").where({ id: ownerId }).first();
+    if (!owner) throw new NotFoundError("Owner not found");
+    return owner;
+  },
+
+  /**
+   * Updates the caller's own profile fields. `owners` has no `name`/`phone`
+   * columns today, so those fields are simply ignored for that role (only
+   * `email` applies) — see the OwnerRow type / migrations if you want to add
+   * a display name for owners later.
+   */
+  async updateProfile(role: Role, userId: string, updates: ProfileUpdateInput) {
+    const table = tableFor(role);
+    const patch: Record<string, unknown> = {};
+
+    if (updates.name !== undefined && role !== "owner") patch.name = updates.name;
+    if (updates.phone !== undefined && role !== "owner") patch.phone = updates.phone;
+    if (updates.email !== undefined) patch.email = updates.email;
+
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestError("No updatable fields provided for this role");
+    }
+
+    if (patch.email) {
+      const existing = await db(table).where({ email: patch.email }).andWhereNot({ id: userId }).first();
+      if (existing) throw new ConflictError("Email is already in use");
+    }
+
+    const [updated] = await db(table).where({ id: userId }).update(patch).returning("*");
+    if (!updated) throw new NotFoundError(`${role} not found`);
+    return updated;
+  },
+
+  /** Changes the caller's own password — requires the current password. */
+  async changePassword(role: Role, userId: string, currentPassword: string, newPassword: string) {
+    const table = tableFor(role);
+    const user = await db<{ id: string; password_hash: string }>(table).where({ id: userId }).first();
+    if (!user) throw new NotFoundError(`${role} not found`);
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) throw new UnauthorizedError("Current password is incorrect");
+
+    const password_hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await db(table).where({ id: userId }).update({ password_hash });
   },
 };

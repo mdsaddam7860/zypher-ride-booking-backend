@@ -8,8 +8,17 @@ export const createRideSchema = z.object({
   scheduledStartAt: z.coerce.date(),
   paymentMethod: z.enum(["cash", "advance"]).default("cash"),
   notes: z.string().max(1000).optional(),
+  // Rider's explicit choice: "now" triggers auto-dispatch to nearby drivers
+  // immediately; "scheduled" leaves the ride for the owner to manually
+  // assign later (driver location isn't predictive far in advance).
+  bookingType: z.enum(["now", "scheduled"]).default("now"),
 });
 export type CreateRideInput = z.infer<typeof createRideSchema>;
+
+export const dispatchOfferResponseSchema = z.object({
+  action: z.enum(["accept", "decline"]),
+});
+export type DispatchOfferResponseInput = z.infer<typeof dispatchOfferResponseSchema>;
 
 export const driverResponseSchema = z.object({
   action: z.enum(["accept", "deny"]),

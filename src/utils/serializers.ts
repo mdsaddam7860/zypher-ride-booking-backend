@@ -41,6 +41,8 @@ export function serializeRide(
     completedAt: ride.completed_at,
     cancelledAt: ride.cancelled_at,
     arrivedAt: ride.arrived_at,
+    bookingType: ride.booking_type,
+    autoDispatchExhausted: ride.auto_dispatch_exhausted,
     createdAt: ride.created_at,
   };
 

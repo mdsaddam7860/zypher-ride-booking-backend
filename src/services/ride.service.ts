@@ -1,11 +1,13 @@
 import { db } from "../db/connection";
-import { DriverRow, FareRow, RideRow, RideStatus, Role, VehicleType } from "../types";
+import { DriverRow, FareRow, RideBookingType, RideRow, RideStatus, Role, VehicleType } from "../types";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../utils/errors";
 import { notificationService } from "./notification.service";
 import { auditService } from "./audit.service";
 import { paymentService } from "./payment.service";
+import { dispatchService } from "./dispatch.service";
 import { calculateRefundAmount } from "../utils/cancellation";
 import { isLongDistance } from "../utils/pricing";
+import { logger } from "../utils/logger";
 
 export const ride_service_cancellable_statuses: RideStatus[] = [
   "pending_assignment",
@@ -41,6 +43,7 @@ export interface RequestRideInput {
   scheduledStartAt: Date;
   paymentMethod: "cash" | "advance";
   notes?: string;
+  bookingType: RideBookingType;
 }
 
 export interface EditRideInput {
@@ -106,6 +109,7 @@ export const rideService = {
           is_long_distance: longDistance,
           payment_method: input.paymentMethod,
           payment_status: input.paymentMethod === "advance" ? "pending" : "not_required",
+          booking_type: input.bookingType,
         })
         .returning("*");
 
@@ -118,12 +122,25 @@ export const rideService = {
         vehicleType: fare.vehicle_type,
         scheduledStartAt: input.scheduledStartAt,
         paymentMethod: input.paymentMethod,
+        bookingType: input.bookingType,
       }, trx);
 
       return newRide;
     });
 
     await notificationService.notifyOwnerNewPendingRide(ride.id);
+
+    // "now" bookings kick off auto-dispatch to nearby drivers immediately;
+    // "scheduled" bookings are left in pending_assignment for the owner to
+    // assign manually later (driver location isn't predictive far ahead of
+    // departure). Dispatch failures shouldn't fail ride creation — the ride
+    // still exists and falls back to the owner's manual queue either way.
+    if (ride.booking_type === "now") {
+      dispatchService.startDispatch(ride.id).catch((err) => {
+        logger.error("Auto-dispatch failed to start", { rideId: ride.id, error: String(err) });
+      });
+    }
+
     return ride;
   },
 

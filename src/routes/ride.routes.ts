@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { rideController } from "../controllers/ride.controller";
 import { ownerController } from "../controllers/owner.controller";
+import { dispatchController } from "../controllers/dispatch.controller";
 import { requireAuth, requireRole } from "../middleware/auth.middleware";
 import { validateBody } from "../middleware/validation.middleware";
 import {
   cancelRideSchema,
   createRideSchema,
+  dispatchOfferResponseSchema,
   driverResponseSchema,
   editRideSchema,
 } from "../validators/ride.validator";
@@ -20,6 +22,14 @@ router.post("/", requireRole("rider"), validateBody(createRideSchema), rideContr
 
 // Past rides for the caller (rider/driver: own history, owner: all).
 router.get("/history", rideController.history);
+
+// Driver accepts/declines an auto-dispatch offer (sequential nearest-driver search).
+router.post(
+  "/offers/:offerId/respond",
+  requireRole("driver"),
+  validateBody(dispatchOfferResponseSchema),
+  dispatchController.respond
+);
 
 // Rider, assigned driver, or owner can view a ride.
 router.get("/:id", rideController.getById);

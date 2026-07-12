@@ -24,6 +24,10 @@ export type RidePaymentStatus =
 
 export type PaymentStatus = "created" | "paid" | "failed" | "refunded" | "partially_refunded";
 
+export type RideBookingType = "now" | "scheduled";
+
+export type DispatchRequestStatus = "offered" | "accepted" | "declined" | "expired" | "superseded";
+
 export interface JwtPayload {
   userId: string;
   role: Role;
@@ -115,6 +119,21 @@ export interface RideRow {
   payment_status: RidePaymentStatus;
   refund_amount: Numeric | null;
   arrived_at: Date | null;
+  booking_type: RideBookingType;
+  auto_dispatch_exhausted: boolean;
+}
+
+export interface RideDispatchRequestRow {
+  id: string;
+  ride_id: string;
+  driver_id: string;
+  status: DispatchRequestStatus;
+  distance_meters: number;
+  sequence: number;
+  offered_at: Date;
+  expires_at: Date;
+  responded_at: Date | null;
+  created_at: Date;
 }
 
 export interface RideAuditLogRow {
