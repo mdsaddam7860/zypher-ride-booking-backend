@@ -10,6 +10,7 @@ import {
   dispatchOfferResponseSchema,
   driverResponseSchema,
   editRideSchema,
+  startRideSchema,
 } from "../validators/ride.validator";
 import { assignDriverSchema } from "../validators/owner.validator";
 
@@ -61,7 +62,7 @@ router.patch("/:id", requireRole("driver"), validateBody(driverResponseSchema), 
 router.post("/:id/arrive", requireRole("driver"), rideController.arrive);
 
 // Driver marks ride started / completed.
-router.post("/:id/start", requireRole("driver"), rideController.start);
+router.post("/:id/start", requireRole("driver"), validateBody(startRideSchema), rideController.start);
 router.post("/:id/complete", requireRole("driver"), rideController.complete);
 
 export default router;

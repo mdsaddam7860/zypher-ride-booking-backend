@@ -1,7 +1,7 @@
 import { db } from "../db/connection";
 import { DriverLocationRow, DriverRow, DriverStatus, LatLng } from "../types";
 import { haversineDistanceMeters } from "../utils/geoutils";
-import { NotFoundError } from "../utils/errors";
+import { NotFoundError, ConflictError } from "../utils/errors";
 
 export interface DriverWithLocation {
   id: string;
@@ -26,15 +26,42 @@ export const driverService = {
       .merge({ lat: location.lat, lng: location.lng, updated_at: new Date() });
   },
 
+  async getLastLocation(driverId: string): Promise<LatLng | null> {
+    const row = await db<DriverLocationRow>("driver_locations").where({ driver_id: driverId }).first();
+    if (!row) return null;
+    return { lat: Number(row.lat), lng: Number(row.lng) };
+  },
+
+  async getById(driverId: string): Promise<DriverRow> {
+    const driver = await db<DriverRow>("drivers").where({ id: driverId }).first();
+    if (!driver) throw new NotFoundError("Driver not found");
+    return driver;
+  },
+
+  /**
+   * Sets a driver's online status. Going "available" requires `is_active`
+   * (i.e. their documents — Aadhaar/license/vehicle — have been verified and
+   * the license hasn't expired) — see driver-document.service.ts, which is
+   * what actually flips `is_active`. Going "offline" is always allowed.
+   */
   async setStatus(driverId: string, status: DriverStatus): Promise<void> {
-    const updated = await db<DriverRow>("drivers").where({ id: driverId }).update({ status });
-    if (updated === 0) throw new NotFoundError("Driver not found");
+    const driver = await db<DriverRow>("drivers").where({ id: driverId }).first();
+    if (!driver) throw new NotFoundError("Driver not found");
+
+    if (status === "available" && !driver.is_active) {
+      throw new ConflictError(
+        "Driver account is not active — submit valid Aadhaar, license, and vehicle documents for verification before going online"
+      );
+    }
+
+    await db<DriverRow>("drivers").where({ id: driverId }).update({ status });
   },
 
   async listAvailableWithLocation(): Promise<DriverWithLocation[]> {
     const rows = await db<DriverRow>("drivers")
       .join("driver_locations", "drivers.id", "driver_locations.driver_id")
       .where("drivers.status", "available")
+      .andWhere("drivers.is_active", true)
       .select(
         "drivers.id as id",
         "drivers.name as name",
@@ -69,8 +96,9 @@ export const driverService = {
   /**
    * Real geospatial nearest-driver search via PostGIS, used by the
    * auto-dispatch flow (dispatch.service.ts). Uses the `geog` column kept in
-   * sync by the `driver_locations_sync_geog` trigger — see migration
-   * 20260706000008. Returns drivers ordered nearest-first, capped to `limit`.
+   * sync by the `driver_locations_sync_geog` trigger. Only considers drivers
+   * who are both `available` and `is_active` (documents verified). Returns
+   * drivers ordered nearest-first, capped to `limit`.
    */
   async findNearestAvailable(
     target: LatLng,
@@ -79,6 +107,7 @@ export const driverService = {
     const rows = await db("drivers as d")
       .join("driver_locations as dl", "d.id", "dl.driver_id")
       .where("d.status", "available")
+      .andWhere("d.is_active", true)
       .whereRaw("ST_DWithin(dl.geog, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)", [
         target.lng,
         target.lat,

@@ -11,12 +11,13 @@ function tableFor(role: Role): "riders" | "drivers" | "owners" {
   return "owners";
 }
 
-export function serializeRiderProfile(rider: RiderRow) {
+export function serializeRiderProfile(rider: RiderRow, opts?: { includeOtp?: boolean }) {
   return {
     riderId: rider.id,
     name: rider.name,
     email: rider.email,
     phone: rider.phone,
+    ...(opts?.includeOtp ? { rideOtp: rider.ride_otp } : {}),
     createdAt: rider.created_at,
   };
 }
@@ -28,6 +29,8 @@ export function serializeDriverProfile(driver: DriverRow) {
     email: driver.email,
     phone: driver.phone,
     status: driver.status,
+    profilePhotoUrl: driver.profile_photo_url,
+    isActive: driver.is_active,
     createdAt: driver.created_at,
   };
 }
@@ -44,6 +47,7 @@ export interface ProfileUpdateInput {
   name?: string;
   email?: string;
   phone?: string;
+  profilePhotoUrl?: string;
 }
 
 export const profileService = {
@@ -78,6 +82,9 @@ export const profileService = {
     if (updates.name !== undefined && role !== "owner") patch.name = updates.name;
     if (updates.phone !== undefined && role !== "owner") patch.phone = updates.phone;
     if (updates.email !== undefined) patch.email = updates.email;
+    if (updates.profilePhotoUrl !== undefined && role === "driver") {
+      patch.profile_photo_url = updates.profilePhotoUrl;
+    }
 
     if (Object.keys(patch).length === 0) {
       throw new BadRequestError("No updatable fields provided for this role");

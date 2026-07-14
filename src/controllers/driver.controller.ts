@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { driverService } from "../services/driver.service";
+import { rideService } from "../services/ride.service";
 import { LatLng } from "../types";
 import { UnauthorizedError } from "../utils/errors";
 
@@ -8,6 +9,13 @@ export const driverController = {
     try {
       if (!req.user) throw new UnauthorizedError();
       await driverService.upsertLocation(req.user.userId, req.body);
+
+      // Best-effort geofence checks — auto-mark-arrived / auto-complete if
+      // this location update happens to land the driver within range of the
+      // relevant point for their current ride. No-ops if not applicable.
+      await rideService.autoMarkArrivedIfNear(req.user.userId, req.body);
+      await rideService.autoCompleteIfNearDropoff(req.user.userId, req.body);
+
       res.status(204).send();
     } catch (err) {
       next(err);

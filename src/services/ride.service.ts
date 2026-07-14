@@ -1,18 +1,24 @@
 import { db } from "../db/connection";
+import { config } from "../config";
 import { DriverRow, FareRow, RideBookingType, RideRow, RideStatus, Role, VehicleType } from "../types";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../utils/errors";
 import { notificationService } from "./notification.service";
 import { auditService } from "./audit.service";
 import { paymentService } from "./payment.service";
 import { dispatchService } from "./dispatch.service";
+import { driverService } from "./driver.service";
 import { calculateRefundAmount } from "../utils/cancellation";
 import { isLongDistance } from "../utils/pricing";
+import { haversineDistanceMeters } from "../utils/geoutils";
 import { logger } from "../utils/logger";
 
+// Cancellable at any stage except once the ride is done — rider, assigned
+// driver, or owner can all cancel up through in_progress.
 export const ride_service_cancellable_statuses: RideStatus[] = [
   "pending_assignment",
   "driver_assigned",
   "driver_accepted",
+  "in_progress",
 ];
 
 // A rider may only have one ride in flight at a time.
@@ -241,6 +247,9 @@ export const rideService = {
       if (driver.status === "offline") {
         throw new ConflictError("Driver is offline");
       }
+      if (!driver.is_active) {
+        throw new ConflictError("Driver's documents are not verified — cannot be assigned rides");
+      }
 
       const overlapping = await trx<RideRow>("rides")
         .where({ driver_id: driverId })
@@ -286,6 +295,11 @@ export const rideService = {
       let result: RideRow;
 
       if (action === "accept") {
+        const driver = await trx<DriverRow>("drivers").where({ id: driverId }).first();
+        if (!driver?.is_active) {
+          throw new ConflictError("Your documents are not verified — you cannot accept rides");
+        }
+
         [result] = await trx<RideRow>("rides")
           .where({ id: rideId })
           .update({ status: "driver_accepted", accepted_at: new Date() })
@@ -306,7 +320,12 @@ export const rideService = {
     return updatedRide;
   },
 
-  /** Driver marks themselves as having reached the pickup point. Allowed once accepted, before the ride starts. */
+  /**
+   * Driver marks themselves as having reached the pickup point. Allowed once
+   * accepted, before the ride starts — and only when their last known
+   * location is actually within `config.geofence.arrivalRadiusMeters` of the
+   * pickup point (server-enforced, not just a UI affordance).
+   */
   async markArrived(rideId: string, driverId: string): Promise<RideRow> {
     let riderId = "";
 
@@ -318,6 +337,18 @@ export const rideService = {
         throw new ConflictError(`Ride cannot be marked arrived from status: ${ride.status}`);
       }
 
+      const location = await driverService.getLastLocation(driverId);
+      if (!location) throw new ConflictError("No known location for this driver — send a location update first");
+      const distance = haversineDistanceMeters(location, {
+        lat: Number(ride.pickup_lat),
+        lng: Number(ride.pickup_lng),
+      });
+      if (distance > config.geofence.arrivalRadiusMeters) {
+        throw new ConflictError(
+          `You're too far from the pickup point to mark arrival (${Math.round(distance)}m away, need to be within ${config.geofence.arrivalRadiusMeters}m)`
+        );
+      }
+
       riderId = ride.rider_id;
 
       const [result] = await trx<RideRow>("rides")
@@ -325,7 +356,7 @@ export const rideService = {
         .update({ arrived_at: new Date() })
         .returning("*");
 
-      await auditService.log(rideId, { userId: driverId, role: "driver" }, "driver_arrived", {}, trx);
+      await auditService.log(rideId, { userId: driverId, role: "driver" }, "driver_arrived", { distanceMeters: Math.round(distance) }, trx);
       return result;
     });
 
@@ -333,7 +364,43 @@ export const rideService = {
     return updatedRide;
   },
 
-  async startRide(rideId: string, driverId: string): Promise<RideRow> {
+  /**
+   * Auto-arrival check — called from the driver's location-update endpoint.
+   * If the driver has a `driver_accepted` ride and is now within the
+   * geofence radius of its pickup point, marks arrival automatically
+   * (same effect as `markArrived`, just system-triggered). Silently no-ops
+   * if there's no such ride or they're not close enough yet — this is meant
+   * to be called on every location ping, not just when relevant.
+   */
+  async autoMarkArrivedIfNear(driverId: string, location: { lat: number; lng: number }): Promise<void> {
+    const ride = await db<RideRow>("rides")
+      .where({ driver_id: driverId, status: "driver_accepted" })
+      .whereNull("arrived_at")
+      .first();
+    if (!ride) return;
+
+    const distance = haversineDistanceMeters(location, {
+      lat: Number(ride.pickup_lat),
+      lng: Number(ride.pickup_lng),
+    });
+    if (distance > config.geofence.arrivalRadiusMeters) return;
+
+    try {
+      await this.markArrived(ride.id, driverId);
+    } catch (err) {
+      // Best-effort — a race with a manual markArrived call (or a status
+      // change in between) shouldn't blow up the location-update request.
+      logger.warn("Auto-arrival check failed", { rideId: ride.id, driverId, error: String(err) });
+    }
+  },
+
+  /**
+   * Driver starts the ride — requires the rider's permanent 4-digit OTP
+   * (told to the driver in person). This is the only gate on `start`; there
+   * is no separate "must have arrived first" requirement, since arrival is
+   * just a notification step, not a hard precondition.
+   */
+  async startRide(rideId: string, driverId: string, otp: string): Promise<RideRow> {
     let riderId = "";
 
     const updatedRide = await db.transaction(async (trx) => {
@@ -342,6 +409,11 @@ export const rideService = {
       if (ride.driver_id !== driverId) throw new ForbiddenError("This ride is not assigned to you");
       if (ride.status !== "driver_accepted") {
         throw new ConflictError(`Ride cannot be started from status: ${ride.status}`);
+      }
+
+      const rider = await trx<{ id: string; ride_otp: string }>("riders").where({ id: ride.rider_id }).first();
+      if (!rider || rider.ride_otp !== otp) {
+        throw new BadRequestError("Incorrect OTP");
       }
 
       riderId = ride.rider_id;
@@ -390,6 +462,30 @@ export const rideService = {
 
     await notificationService.notifyRiderRideUpdated(riderId, rideId, "completed");
     return updatedRide;
+  },
+
+  /**
+   * Auto-completion check — called from the driver's location-update
+   * endpoint. If the driver has an `in_progress` ride and is now within the
+   * geofence radius of its dropoff point, completes the ride automatically
+   * (same effect as `completeRide`, just system-triggered). Silently no-ops
+   * otherwise — meant to be called on every location ping.
+   */
+  async autoCompleteIfNearDropoff(driverId: string, location: { lat: number; lng: number }): Promise<void> {
+    const ride = await db<RideRow>("rides").where({ driver_id: driverId, status: "in_progress" }).first();
+    if (!ride) return;
+
+    const distance = haversineDistanceMeters(location, {
+      lat: Number(ride.dropoff_lat),
+      lng: Number(ride.dropoff_lng),
+    });
+    if (distance > config.geofence.completionRadiusMeters) return;
+
+    try {
+      await this.completeRide(ride.id, driverId);
+    } catch (err) {
+      logger.warn("Auto-completion check failed", { rideId: ride.id, driverId, error: String(err) });
+    }
   },
 
   async cancelRide(

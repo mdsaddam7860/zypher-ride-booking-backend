@@ -30,7 +30,7 @@ export const profileController = {
     try {
       if (!req.user) throw new UnauthorizedError();
       const rider = await profileService.getRiderById(req.user.userId);
-      res.status(200).json(serializeRiderProfile(rider));
+      res.status(200).json(serializeRiderProfile(rider, { includeOtp: true }));
     } catch (err) {
       next(err);
     }

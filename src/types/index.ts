@@ -41,6 +41,7 @@ export interface RiderRow {
   email: string;
   phone: string;
   password_hash: string;
+  ride_otp: string;
   created_at: Date;
 }
 
@@ -51,7 +52,27 @@ export interface DriverRow {
   phone: string;
   password_hash: string;
   status: DriverStatus;
+  profile_photo_url: string | null;
+  is_active: boolean;
   created_at: Date;
+}
+
+export interface DriverDocumentsRow {
+  id: string;
+  driver_id: string;
+  aadhar_number: string | null;
+  aadhar_photo_url: string | null;
+  license_number: string | null;
+  license_expiry: Date | null;
+  license_photo_url: string | null;
+  vehicle_registration_number: string | null;
+  vehicle_model: string | null;
+  vehicle_photo_url: string | null;
+  is_verified: boolean;
+  verified_by: string | null;
+  verified_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface OwnerRow {

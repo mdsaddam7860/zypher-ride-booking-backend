@@ -5,7 +5,7 @@ import { notificationService } from "./notification.service";
 import { auditService } from "./audit.service";
 import { offerTimeoutStore } from "../realtime/offerTimeoutStore";
 import { emitToDriver, emitToOwners, emitToRider, emitToRideWatchers } from "../realtime/socket";
-import { RideDispatchRequestRow, RideRow } from "../types";
+import { RideDispatchRequestRow, RideRow, DriverRow } from "../types";
 import { ConflictError, ForbiddenError, NotFoundError } from "../utils/errors";
 import { logger } from "../utils/logger";
 
@@ -200,6 +200,11 @@ export const dispatchService = {
       if (!ride) throw new NotFoundError("Ride not found");
       if (ride.status !== "pending_assignment" || ride.driver_id) {
         throw new ConflictError("Ride is no longer available — it may have already been assigned");
+      }
+
+      const driver = await trx<DriverRow>("drivers").where({ id: driverId }).first();
+      if (!driver?.is_active) {
+        throw new ConflictError("Your documents are not verified — you cannot accept rides");
       }
 
       await trx<RideDispatchRequestRow>("ride_dispatch_requests")

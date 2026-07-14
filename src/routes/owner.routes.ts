@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { ownerController } from "../controllers/owner.controller";
 import { profileController } from "../controllers/profile.controller";
+import { driverDocumentController } from "../controllers/driver-document.controller";
 import { requireAuth, requireRole } from "../middleware/auth.middleware";
 import { validateQuery, validateBody } from "../middleware/validation.middleware";
 import {
@@ -10,6 +11,7 @@ import {
   nearbyDriversQuerySchema,
 } from "../validators/owner.validator";
 import { changePasswordSchema, updateProfileSchema } from "../validators/profile.validator";
+import { verifyDriverDocumentsSchema } from "../validators/driver-document.validator";
 
 const router = Router();
 
@@ -36,5 +38,13 @@ router.get("/fares", validateQuery(listFaresQuerySchema), ownerController.listFa
 router.get("/fares/:fareId", ownerController.getFare);
 
 router.get("/riders/:riderId", profileController.getRiderByIdForOwner);
+
+// Driver document review — Aadhaar/license/vehicle verification gating driver.is_active.
+router.get("/drivers/:driverId/documents", driverDocumentController.getForOwner);
+router.patch(
+  "/drivers/:driverId/documents/verify",
+  validateBody(verifyDriverDocumentsSchema),
+  driverDocumentController.verify
+);
 
 export default router;

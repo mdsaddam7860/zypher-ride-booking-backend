@@ -23,6 +23,18 @@ async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
 
+/** Generates a 4-digit ride OTP not currently in use by any other rider. */
+async function generateUniqueRideOtp(): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const candidate = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+    const existing = await db<RiderRow>("riders").where({ ride_otp: candidate }).first();
+    if (!existing) return candidate;
+  }
+  // Astronomically unlikely with only ~10k riders and 20 retries, but fail
+  // loudly rather than silently assigning a duplicate OTP.
+  throw new Error("Could not generate a unique rider OTP after 20 attempts");
+}
+
 export const authService = {
   async registerRider(input: RegisterRiderOrDriverInput): Promise<AuthResult> {
     const existing = await db<RiderRow>("riders")
@@ -32,8 +44,9 @@ export const authService = {
     if (existing) throw new ConflictError("A rider with this email or phone already exists");
 
     const password_hash = await hashPassword(input.password);
+    const ride_otp = await generateUniqueRideOtp();
     const [row] = await db<RiderRow>("riders")
-      .insert({ name: input.name, email: input.email, phone: input.phone, password_hash })
+      .insert({ name: input.name, email: input.email, phone: input.phone, password_hash, ride_otp })
       .returning("id");
 
     const userId = row.id;

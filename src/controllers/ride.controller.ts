@@ -8,6 +8,7 @@ import {
   CreateRideInput,
   DriverResponseInput,
   EditRideInput,
+  StartRideInput,
 } from "../validators/ride.validator";
 import { serializeRide } from "../utils/serializers";
 import { ForbiddenError, UnauthorizedError } from "../utils/errors";
@@ -108,10 +109,10 @@ export const rideController = {
     }
   },
 
-  async start(req: Request<{ id: string }>, res: Response, next: NextFunction) {
+  async start(req: Request<{ id: string }, unknown, StartRideInput>, res: Response, next: NextFunction) {
     try {
       if (!req.user) throw new UnauthorizedError();
-      const ride = await rideService.startRide(req.params.id, req.user.userId);
+      const ride = await rideService.startRide(req.params.id, req.user.userId, req.body.otp);
       const fare = await fareService.getById(ride.fare_id);
       const contact = await buildContact(ride, "driver");
       res.status(200).json(serializeRide(ride, { fare, viewerRole: "driver", contact }));

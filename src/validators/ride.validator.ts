@@ -20,6 +20,11 @@ export const dispatchOfferResponseSchema = z.object({
 });
 export type DispatchOfferResponseInput = z.infer<typeof dispatchOfferResponseSchema>;
 
+export const startRideSchema = z.object({
+  otp: z.string().length(4).regex(/^\d{4}$/, "OTP must be 4 digits"),
+});
+export type StartRideInput = z.infer<typeof startRideSchema>;
+
 export const driverResponseSchema = z.object({
   action: z.enum(["accept", "deny"]),
 });

@@ -76,6 +76,15 @@ export const config = {
     offerTimeoutSeconds: parseInt(process.env.DISPATCH_OFFER_TIMEOUT_SECONDS ?? "20", 10),
   },
 
+  geofence: {
+    // How close (meters) the driver's last known location must be to the
+    // pickup point before "arrived" can be marked (manually or
+    // automatically), and to the dropoff point before the ride can
+    // auto-complete.
+    arrivalRadiusMeters: parseInt(process.env.GEOFENCE_ARRIVAL_RADIUS_METERS ?? "200", 10),
+    completionRadiusMeters: parseInt(process.env.GEOFENCE_COMPLETION_RADIUS_METERS ?? "200", 10),
+  },
+
   // Firebase Cloud Messaging — HTTP v1 API (via firebase-admin), not the
   // deprecated legacy Server Key API.
   //
