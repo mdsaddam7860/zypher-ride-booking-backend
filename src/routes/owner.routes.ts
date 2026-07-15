@@ -40,6 +40,8 @@ router.get("/fares/:fareId", ownerController.getFare);
 router.get("/riders/:riderId", profileController.getRiderByIdForOwner);
 
 // Driver document review — Aadhaar/license/vehicle verification gating driver.is_active.
+// Review queue — must be registered before the :driverId route below.
+router.get("/drivers/pending-documents", driverDocumentController.listPending);
 router.get("/drivers/:driverId/documents", driverDocumentController.getForOwner);
 router.patch(
   "/drivers/:driverId/documents/verify",

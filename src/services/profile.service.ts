@@ -31,6 +31,7 @@ export function serializeDriverProfile(driver: DriverRow) {
     status: driver.status,
     profilePhotoUrl: driver.profile_photo_url,
     isActive: driver.is_active,
+    preferredRegion: driver.preferred_region,
     createdAt: driver.created_at,
   };
 }
@@ -48,6 +49,7 @@ export interface ProfileUpdateInput {
   email?: string;
   phone?: string;
   profilePhotoUrl?: string;
+  preferredRegion?: string;
 }
 
 export const profileService = {
@@ -84,6 +86,9 @@ export const profileService = {
     if (updates.email !== undefined) patch.email = updates.email;
     if (updates.profilePhotoUrl !== undefined && role === "driver") {
       patch.profile_photo_url = updates.profilePhotoUrl;
+    }
+    if (updates.preferredRegion !== undefined && role === "driver") {
+      patch.preferred_region = updates.preferredRegion;
     }
 
     if (Object.keys(patch).length === 0) {

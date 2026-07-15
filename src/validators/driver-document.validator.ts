@@ -14,7 +14,13 @@ export const submitDriverDocumentsSchema = z
   .refine((data) => Object.keys(data).length > 0, { message: "At least one field must be provided" });
 export type SubmitDriverDocumentsInput = z.infer<typeof submitDriverDocumentsSchema>;
 
-export const verifyDriverDocumentsSchema = z.object({
-  isVerified: z.boolean(),
-});
+export const verifyDriverDocumentsSchema = z
+  .object({
+    isVerified: z.boolean(),
+    rejectionReason: z.string().min(1).max(500).optional(),
+  })
+  .refine((data) => data.isVerified || (data.rejectionReason && data.rejectionReason.length > 0), {
+    message: "rejectionReason is required when rejecting a driver's documents",
+    path: ["rejectionReason"],
+  });
 export type VerifyDriverDocumentsInput = z.infer<typeof verifyDriverDocumentsSchema>;

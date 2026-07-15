@@ -26,6 +26,16 @@ export const driverDocumentController = {
     }
   },
 
+  // GET /api/owner/drivers/pending-documents — review queue of unverified submissions.
+  async listPending(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const docs = await driverDocumentService.listPending();
+      res.status(200).json(docs);
+    } catch (err) {
+      next(err);
+    }
+  },
+
   // GET /api/owner/drivers/:driverId/documents — owner reviews a driver's submitted documents.
   async getForOwner(req: Request<{ driverId: string }>, res: Response, next: NextFunction) {
     try {
@@ -47,7 +57,8 @@ export const driverDocumentController = {
       const result = await driverDocumentService.setVerification(
         req.params.driverId,
         req.user.userId,
-        req.body.isVerified
+        req.body.isVerified,
+        req.body.rejectionReason
       );
       res.status(200).json(result);
     } catch (err) {

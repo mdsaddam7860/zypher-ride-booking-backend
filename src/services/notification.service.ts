@@ -99,4 +99,22 @@ export const notificationService = {
       `Ride ${rideId} couldn't be auto-assigned — needs manual assignment.`,
       rideId
     ),
+
+  notifyDriverDocumentsApproved: (driverId: string) =>
+    send(
+      driverId,
+      "driver",
+      "Documents approved",
+      "Your documents have been verified. You can now go online and accept rides."
+    ),
+
+  notifyDriverDocumentsRejected: (driverId: string, reason: string) =>
+    send(
+      driverId,
+      "driver",
+      "Documents rejected — resubmission required",
+      reason
+        ? `Your documents were rejected: ${reason}. Please correct and resubmit.`
+        : "Your documents were rejected. Please review and resubmit."
+    ),
 };

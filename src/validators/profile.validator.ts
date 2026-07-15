@@ -5,6 +5,8 @@ export const updateProfileSchema = z
     name: z.string().min(1).max(150).optional(),
     email: z.string().email().optional(),
     phone: z.string().min(6).max(20).optional(),
+    profilePhotoUrl: z.string().url().optional(),
+    preferredRegion: z.string().min(1).max(100).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: "At least one field must be provided" });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

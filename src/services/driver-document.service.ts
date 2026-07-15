@@ -1,6 +1,7 @@
 import { db } from "../db/connection";
 import { DriverDocumentsRow, DriverRow } from "../types";
 import { NotFoundError } from "../utils/errors";
+import { notificationService } from "./notification.service";
 
 export interface SubmitDocumentsInput {
   aadharNumber?: string;
@@ -25,6 +26,7 @@ function serializeDocuments(doc: DriverDocumentsRow) {
     vehicleModel: doc.vehicle_model,
     vehiclePhotoUrl: doc.vehicle_photo_url,
     isVerified: doc.is_verified,
+    rejectionReason: doc.rejection_reason,
     verifiedAt: doc.verified_at,
     updatedAt: doc.updated_at,
   };
@@ -59,6 +61,27 @@ async function recomputeIsActive(driverId: string): Promise<boolean> {
 }
 
 export const driverDocumentService = {
+  /** Documents submitted but not yet verified — the owner's review queue. */
+  async listPending() {
+    const rows = await db<DriverDocumentsRow>("driver_documents")
+      .join("drivers", "drivers.id", "driver_documents.driver_id")
+      .where("driver_documents.is_verified", false)
+      .orderBy("driver_documents.updated_at", "asc")
+      .select(
+        "driver_documents.*",
+        "drivers.name as driver_name",
+        "drivers.email as driver_email",
+        "drivers.phone as driver_phone"
+      );
+
+    return rows.map((row) => ({
+      ...serializeDocuments(row),
+      driverName: row.driver_name,
+      driverEmail: row.driver_email,
+      driverPhone: row.driver_phone,
+    }));
+  },
+
   async getByDriverId(driverId: string) {
     const doc = await db<DriverDocumentsRow>("driver_documents").where({ driver_id: driverId }).first();
     return doc ? serializeDocuments(doc) : null;
@@ -77,6 +100,7 @@ export const driverDocumentService = {
       vehicle_model: input.vehicleModel,
       vehicle_photo_url: input.vehiclePhotoUrl,
       is_verified: false,
+      rejection_reason: null,
       verified_by: null,
       verified_at: null,
       updated_at: new Date(),
@@ -99,8 +123,13 @@ export const driverDocumentService = {
     return serializeDocuments(doc);
   },
 
-  /** Owner reviews and verifies (or rejects) a driver's submitted documents. */
-  async setVerification(driverId: string, ownerId: string, isVerified: boolean) {
+  /** Owner reviews and verifies (or rejects, with a reason) a driver's submitted documents. */
+  async setVerification(
+    driverId: string,
+    ownerId: string,
+    isVerified: boolean,
+    rejectionReason?: string
+  ) {
     const existing = await db<DriverDocumentsRow>("driver_documents").where({ driver_id: driverId }).first();
     if (!existing) throw new NotFoundError("Driver has not submitted documents yet");
 
@@ -108,6 +137,7 @@ export const driverDocumentService = {
       .where({ driver_id: driverId })
       .update({
         is_verified: isVerified,
+        rejection_reason: isVerified ? null : rejectionReason ?? null,
         verified_by: isVerified ? ownerId : null,
         verified_at: isVerified ? new Date() : null,
         updated_at: new Date(),
@@ -115,6 +145,13 @@ export const driverDocumentService = {
       .returning("*");
 
     const isActive = await recomputeIsActive(driverId);
+
+    if (isVerified) {
+      await notificationService.notifyDriverDocumentsApproved(driverId);
+    } else {
+      await notificationService.notifyDriverDocumentsRejected(driverId, rejectionReason ?? "");
+    }
+
     return { ...serializeDocuments(doc), driverIsActive: isActive };
   },
 };

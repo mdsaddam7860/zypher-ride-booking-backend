@@ -10,7 +10,7 @@ export type RideStatus =
   | "completed"
   | "cancelled";
 
-export type VehicleType = "4_seater" | "7_seater";
+export type VehicleType = "2_wheeler" | "3_wheeler" | "4_seater" | "7_seater";
 
 export type RidePaymentMethod = "cash" | "advance";
 
@@ -53,6 +53,7 @@ export interface DriverRow {
   password_hash: string;
   status: DriverStatus;
   profile_photo_url: string | null;
+  preferred_region: string | null;
   is_active: boolean;
   created_at: Date;
 }
@@ -69,6 +70,7 @@ export interface DriverDocumentsRow {
   vehicle_model: string | null;
   vehicle_photo_url: string | null;
   is_verified: boolean;
+  rejection_reason: string | null;
   verified_by: string | null;
   verified_at: Date | null;
   created_at: Date;
@@ -140,6 +142,7 @@ export interface RideRow {
   payment_status: RidePaymentStatus;
   refund_amount: Numeric | null;
   arrived_at: Date | null;
+  waiting_charge: Numeric;
   booking_type: RideBookingType;
   auto_dispatch_exhausted: boolean;
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { latLngSchema } from "./common.validator";
 
-export const vehicleTypeSchema = z.enum(["4_seater", "7_seater"]);
+export const vehicleTypeSchema = z.enum(["2_wheeler", "3_wheeler", "4_seater", "7_seater"]);
 
 export const createFareSchema = z.object({
   pickupLocation: latLngSchema,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { vehicleTypeSchema } from "./fare.validator";
 
 export const assignDriverSchema = z.object({
   driverId: z.string().uuid(),
@@ -26,7 +27,7 @@ export type ListRidesQuery = z.infer<typeof listRidesQuerySchema>;
 
 // GET /api/owner/fares — browse fare estimates (rate-management / audit view).
 export const listFaresQuerySchema = z.object({
-  vehicleType: z.enum(["4_seater", "7_seater"]).optional(),
+  vehicleType: vehicleTypeSchema.optional(),
   riderId: z.string().uuid().optional(),
   // Only fares that were actually turned into a ride vs raw estimates never booked.
   bookedOnly: z.coerce.boolean().optional(),

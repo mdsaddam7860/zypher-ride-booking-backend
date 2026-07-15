@@ -44,6 +44,16 @@ export const config = {
     ),
     // Per-vehicle-type pricing, in INR.
     vehiclePricing: {
+      "2_wheeler": {
+        baseFee: parseFloat(process.env.FARE_2WHEELER_BASE_FEE ?? "20"),
+        perKm: parseFloat(process.env.FARE_2WHEELER_PER_KM ?? "6"),
+        perMinute: parseFloat(process.env.FARE_2WHEELER_PER_MINUTE ?? "0.5"),
+      },
+      "3_wheeler": {
+        baseFee: parseFloat(process.env.FARE_3WHEELER_BASE_FEE ?? "40"),
+        perKm: parseFloat(process.env.FARE_3WHEELER_PER_KM ?? "10"),
+        perMinute: parseFloat(process.env.FARE_3WHEELER_PER_MINUTE ?? "1"),
+      },
       "4_seater": {
         baseFee: parseFloat(process.env.FARE_4SEATER_BASE_FEE ?? "80"),
         perKm: parseFloat(process.env.FARE_4SEATER_PER_KM ?? "14"),
@@ -83,6 +93,14 @@ export const config = {
     // auto-complete.
     arrivalRadiusMeters: parseInt(process.env.GEOFENCE_ARRIVAL_RADIUS_METERS ?? "200", 10),
     completionRadiusMeters: parseInt(process.env.GEOFENCE_COMPLETION_RADIUS_METERS ?? "200", 10),
+  },
+
+  waiting: {
+    // Minutes of free wait after the driver marks/auto-marks arrival,
+    // before waiting charges start accruing.
+    freeMinutes: parseInt(process.env.WAITING_FREE_MINUTES ?? "3", 10),
+    // INR charged per minute of wait beyond the free window.
+    perMinuteRate: parseFloat(process.env.WAITING_PER_MINUTE_RATE ?? "5"),
   },
 
   // Firebase Cloud Messaging — HTTP v1 API (via firebase-admin), not the
