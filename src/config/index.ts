@@ -103,6 +103,16 @@ export const config = {
     perMinuteRate: parseFloat(process.env.WAITING_PER_MINUTE_RATE ?? "5"),
   },
 
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
+    apiKey: process.env.CLOUDINARY_API_KEY ?? "",
+    apiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
+    // Folder driver document images are uploaded under, for organization
+    // inside the Cloudinary media library.
+    driverDocumentsFolder: process.env.CLOUDINARY_DRIVER_DOCS_FOLDER ?? "ride-booking/driver-documents",
+    profilePhotosFolder: process.env.CLOUDINARY_PROFILE_PHOTOS_FOLDER ?? "ride-booking/profile-photos",
+  },
+
   // Firebase Cloud Messaging — HTTP v1 API (via firebase-admin), not the
   // deprecated legacy Server Key API.
   //

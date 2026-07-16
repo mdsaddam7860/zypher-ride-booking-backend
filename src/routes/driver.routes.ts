@@ -7,6 +7,7 @@ import { validateBody } from "../middleware/validation.middleware";
 import { updateLocationSchema } from "../validators/driver.validator";
 import { changePasswordSchema, updateProfileSchema } from "../validators/profile.validator";
 import { submitDriverDocumentsSchema } from "../validators/driver-document.validator";
+import { uploadDriverDocumentPhotos, uploadProfilePhoto } from "../middleware/upload.middleware";
 
 const router = Router();
 
@@ -14,14 +15,27 @@ router.use(requireAuth, requireRole("driver"));
 
 // GET /api/drivers/me — driver pulls their own profile.
 router.get("/me", profileController.getMyDriverProfile);
-// PATCH /api/drivers/me — update own name/email/phone/profilePhotoUrl.
-router.patch("/me", validateBody(updateProfileSchema), profileController.updateMyProfile);
+// PATCH /api/drivers/me — update own name/email/phone/profilePhotoUrl (or upload a profilePhoto file).
+router.patch(
+    "/me",
+    uploadProfilePhoto,
+    validateBody(updateProfileSchema),
+    profileController.updateMyProfile
+);
 // PATCH /api/drivers/me/password — change own password (requires current password).
 router.patch("/me/password", validateBody(changePasswordSchema), profileController.changeMyPassword);
 
-// GET/POST /api/drivers/documents — driver views/submits Aadhaar, license, vehicle details.
+// GET/POST /api/drivers/documents — driver views/submits Aadhaar, license,
+// vehicle details. POST is multipart/form-data: multer parses the uploaded
+// photo files (and populates req.body with the text fields) before the zod
+// body validation runs.
 router.get("/documents/me", driverDocumentController.getMine);
-router.post("/documents", validateBody(submitDriverDocumentsSchema), driverDocumentController.submit);
+router.post(
+    "/documents",
+    uploadDriverDocumentPhotos,
+    validateBody(submitDriverDocumentsSchema),
+    driverDocumentController.submit
+);
 
 router.post("/location", validateBody(updateLocationSchema), driverController.updateLocation);
 router.post("/status/available", driverController.setAvailable);

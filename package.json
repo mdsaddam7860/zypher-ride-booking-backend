@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "description": "Ride booking backend: riders request fares/rides, owner manually assigns drivers, drivers accept/deny and run the trip.",
   "main": "dist/server.js",
-  "engines": {
-    "node": "22.x"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
@@ -22,6 +19,7 @@
     "@logtail/node": "^0.5.2",
     "@logtail/winston": "^0.5.2",
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.10.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
@@ -29,6 +27,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
+    "multer": "^2.2.0",
     "pg": "^8.12.0",
     "socket.io": "^4.8.3",
     "uuid": "^9.0.1",
@@ -41,6 +40,7 @@
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.12",
     "@types/jsonwebtoken": "^9.0.6",
+    "@types/multer": "^1.4.13",
     "@types/node": "^20.14.9",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^9.0.8",

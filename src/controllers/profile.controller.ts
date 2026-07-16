@@ -7,6 +7,8 @@ import {
 } from "../services/profile.service";
 import { UnauthorizedError } from "../utils/errors";
 import { ChangePasswordInput, UpdateProfileInput } from "../validators/profile.validator";
+import { uploadImageBuffer } from "../services/cloudinary.service";
+import { config } from "../config";
 
 function serializeForRole(role: "rider" | "driver" | "owner", row: unknown) {
   if (role === "rider") return serializeRiderProfile(row as Parameters<typeof serializeRiderProfile>[0]);
@@ -59,11 +61,24 @@ export const profileController = {
   },
 
   // PATCH /api/{riders,drivers}/me and /api/owner/me — update own profile.
+  // PATCH /api/{riders,drivers,owner}/me — update own profile. If a
+  // `profilePhoto` file was uploaded (driver only, via uploadProfilePhoto
+  // middleware on the route), it's uploaded to Cloudinary and takes
+  // precedence over a plain `profilePhotoUrl` string in the body.
   async updateMyProfile(req: Request<unknown, unknown, UpdateProfileInput>, res: Response, next: NextFunction) {
     try {
       if (!req.user) throw new UnauthorizedError();
       const role = req.user.role;
-      const updated = await profileService.updateProfile(role, req.user.userId, req.body);
+
+      const file = req.file as Express.Multer.File | undefined;
+      const profilePhotoUrl = file
+        ? await uploadImageBuffer(file.buffer, config.cloudinary.profilePhotosFolder)
+        : req.body.profilePhotoUrl;
+
+      const updated = await profileService.updateProfile(role, req.user.userId, {
+        ...req.body,
+        profilePhotoUrl,
+      });
       res.status(200).json(serializeForRole(role, updated));
     } catch (err) {
       next(err);
